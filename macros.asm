@@ -918,6 +918,15 @@ dibujarPlano MACRO
 		MOV mandarColor, 0001B
 
 		dibujarColumna mandarPosicion, mandarAncho, mandarAlto, mandarDecena, mandarUnidad, mandarColor, mensajeExtra
+
+		;Area de sonido
+		PUSH AX
+		MOV AL, mandarDecena
+		SUB AL, 48D
+		reproducirSonido AL
+		delayX
+		POP AX
+
 		ADD AH, DH
 		INC SI
 		CMP SI, totalUsuarios[0002]
@@ -947,6 +956,13 @@ burbujaDescendente MACRO tipo, mensaje
 		MOV AH, indexJugadoresTopOrdenados[SI]
 		MOV indexJugadoresTopOrdenados[DI], AH
 		MOV indexJugadoresTopOrdenados[SI], AL
+
+		;Area de sonido
+		PUSH AX
+		MOV AL, decenaJugadoresTop[SI]
+		SUB AL, 48D
+		reproducirSonido AL
+		POP AX
 
 		MOV AH, tipo
 		CMP AH, 0000
@@ -1014,6 +1030,7 @@ dibujarDescendente MACRO mensaje
 		MOV mandarColor, 0001B
 
 		dibujarColumna mandarPosicion, mandarAncho, mandarAlto, mandarDecena, mandarUnidad, mandarColor, mensaje
+
 		ADD AH, DH
 		INC SI
 		CMP SI, totalUsuarios[0002]
@@ -1760,6 +1777,15 @@ ShellSort MACRO	arreglo, n, tipo		; void ShellSort(int *a, int n){
 				PUSH BX
 				MOV BX, AX
 				MOV arreglo[BX], DL		;				a[j] = a[j - h];
+
+				;Area de sonido
+				PUSH AX
+				MOV AL, decenaJugadoresTop[BX]
+				SUB AL, 48D
+				reproducirSonido AL
+				POP AX
+
+
 				MOV indexJugadoresTopOrdenados[BX], DH
 				MOV BL, tipo
 				CMP BL, 0000
@@ -1787,6 +1813,15 @@ ShellSort MACRO	arreglo, n, tipo		; void ShellSort(int *a, int n){
 				MOV BX, AX
 				MOV AL, t
 				MOV arreglo[BX], AL		;			a[j] = t;
+
+				;Area de sonido
+				PUSH AX
+				MOV AL, decenaJugadoresTop[BX]
+				SUB AL, 48D
+				reproducirSonido AL
+				POP AX
+
+
 				MOV AL, t1
 				MOV indexJugadoresTopOrdenados[BX], AL
 				POP AX
@@ -1904,5 +1939,200 @@ dibujarAscendenteQuick MACRO mensaje
 		CMP SI, totalUsuarios[0002]
 		JL CICLO
 
+	poppear
+ENDM
+
+reproducirSonido MACRO decena
+	LOCAL S1, S3, S5, S7, S9, SALIR
+	pushear
+	MOV AL, decena
+	CMP AL, 0000
+	JE S1
+	CMP AL, 0001
+	JE S1
+	CMP AL, 0002
+	JE S3
+	CMP AL, 0003
+	JE S3
+	CMP AL, 0004
+	JE S5
+	CMP AL, 0005
+	JE S5
+	CMP AL, 0006
+	JE S7
+	CMP AL, 0007
+	JE S7
+	CMP AL, 0008
+	JE S9
+	CMP AL, 0009
+	JE S9
+
+	S1:
+		MOV AL, 86H
+		OUT 43H, AL
+		MOV AX, 11931
+		JMP SALIR
+	S3:
+		MOV AL, 86H
+		OUT 43H, AL
+		MOV AX, 3977
+		JMP SALIR
+	S5:
+		MOV AL, 86H
+		OUT 43H, AL
+		MOV AX, 2386
+		JMP SALIR
+	S7:
+		MOV AL, 86H
+		OUT 43H, AL
+		MOV AX, 1704
+		JMP SALIR
+	S9:
+		MOV AL, 86H
+		OUT 43H, AL
+		MOV AX, 1325
+		JMP SALIR
+
+	SALIR:
+		OUT 42H, AL
+		MOV AL, AH
+		OUT 42H, AL
+		IN AL, 61H
+		OR AL, 00000011B
+		OUT 61H, AL
+		delaySonido
+		IN AL, 61H
+		AND AL, 11111100B
+		OUT 61H, AL
+		poppear
+ENDM
+
+delaySonido MACRO
+	LOCAL LOOP1, LOOP2,LOOP3
+	pushear
+	MOV AL, 25D
+	LOOP1:
+    	MOV SI, 100
+		LOOP2:
+    		PUSH SI
+    		MOV SI, 10
+    		LOOP3:
+      			DEC SI
+      			JNZ LOOP3
+    		POP SI  
+    		DEC SI
+    		JNZ LOOP2
+    	DEC AL
+		JNZ LOOP1
+	poppear
+ENDM
+
+delayX MACRO
+	LOCAL LOOP1, LOOP2,LOOP3
+	pushear
+	MOV AL, 25D
+	LOOP1:
+    	MOV SI, 1000
+		LOOP2:
+    		PUSH SI
+    		MOV SI, 10
+    		LOOP3:
+      			DEC SI
+      			JNZ LOOP3
+    		POP SI  
+    		DEC SI
+    		JNZ LOOP2
+    	DEC AL
+		JNZ LOOP1
+	poppear
+ENDM
+
+llamarUsuario MACRO
+	LOCAL CICLO, SALIR
+	pushear
+	XOR SI, SI
+
+	CICLO:
+		MOV AL, datoUsuario[SI]
+		CMP AL, 36D
+		JE SALIR
+		MOV mensajeJuego[SI + 0004], AL
+		INC SI
+		CMP SI, 07
+		JL CICLO
+	SALIR:
+		poppear
+ENDM
+
+pintarJuego MACRO color
+	LOCAL IZQUIERDA, DERECHA, CICLO, SALIR
+	pushear
+
+	CICLO:
+		MOV AX, 0013H
+		INT 0010H
+		MOV CX, 013EH
+		dibujarMensaje mensajeJuego
+		pintarFondo
+		pintarCarro
+	
+		getChar
+		CMP AL, 0075D
+		JE IZQUIERDA
+		CMP AL, 0080D
+		JE DERECHA
+		CMP AL, 0032D
+		JE SALIR
+		JMP CICLO
+	
+		IZQUIERDA:
+			MOV CL, posicionCarro
+			DEC CL
+			JMP VERIFICARMOV
+	
+		DERECHA:
+			MOV CL, posicionCarro
+			INC CL
+			JMP VERIFICARMOV
+	
+		VERIFICARMOV:
+			CMP CL, 02
+			JB CICLO
+			CMP CL, 34
+			JA CICLO
+			MOV posicionCarro, CL
+			pintarFondo
+			JMP CICLO
+
+	SALIR:
+		poppear
+ENDM
+
+pintarFondo MACRO
+	pushear
+	;Area de fondo
+		MOV AH, 06H
+		MOV AL, 00
+		MOV BH, 0111B
+		MOV CH, 02
+		MOV CL, 02
+		MOV DH, 23
+		MOV DL, 36
+		INT 10H
+	poppear
+ENDM
+
+pintarCarro MACRO
+	pushear
+	;Area de carro
+		MOV AH, 06H
+		MOV AL, 00
+		MOV BH, colorCarro
+		MOV CH, 21
+		MOV CL, posicionCarro
+		MOV DH, 23
+		MOV DL, CL
+		ADD DL, 02
+		INT 10H
 	poppear
 ENDM
