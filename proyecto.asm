@@ -139,7 +139,32 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
  		t1 DB ?
 
  		tipoQuick DB 0000
+
+ 		teest DB 0000
+
+ 											;===========NOMBRE==============;						  ;==NIVEL==;				;===SCORE====;				   ;==============TIEMPO================;
+ 											;4    5    6    7    8    9    10							16    17				  21   22   23					27   28        30   31        33   34
+ 		mensajeJuego DB 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 58D, 48D, 48D, 58D, 48D, 48D, '$'
  		
+
+ 		posicionCarro DB 18D
+ 		colorCarro DB 0001B
+
+ 		;00-06 -> NOMBRE
+ 		;07-08 -> NIVEL
+ 		;09-10 -> TIEMPO NIVEL
+ 		;11-12 -> TIEMPO OBSTACULOS
+ 		;13-14 -> TIEMPO PREMIO
+ 		;15-16 -> PUNTOS OBSTACULOS
+ 		;17-18 -> PUNTOS PREMIO
+ 		;19    -> COLOR
+ 		nivel1 DB 20 dup(32D)
+ 		nivel2 DB 20 dup(32D)
+ 		nivel3 DB 20 dup(32D)
+ 		nivel4 DB 20 dup(32D)
+ 		nivel5 DB 20 dup(32D)
+ 		nivel6 DB 20 dup(32D)
+
 	;==DATOS EXTRA==
 	;===============
 
@@ -167,35 +192,6 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 		;================
 		;==MENU INICIAL==
 		;================
-
-		;============
-		;==INGRESAR==
-		;============
-			INGRESAR:
-				clearScreen ; Limpia la pantalla
-				print mensajeIngreseUsuario ; Solicita el usuario
-				stringRead  datoUsuario ; Lee el usuario
-				print mensajeIngresePassword ; Solicita la contraseña
-				stringRead  datoPassword ; Lee la password
-				CALL comprobarLogin
-				CMP matchUsuario, 0000
-				JE ERRORLOGIN
-
-				stringCompare datoUsuario, usuarioAdmin
-				CMP comparation, 0001
-				JE AREAADMINISTRADOR ; Es administrador
-				JMP AREAUSUARIO ; Entra al area
-
-			ERRORLOGIN:
-				clearScreen
-				print errorLoginIncorrecto
-				resetTmp
-				resetOriginales
-				getChar
-				JMP INGRESAR
-		;============
-		;==INGRESAR==
-		;============
 
 		;=================
 		;==ADMINISTRADOR==
@@ -437,17 +433,37 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 				clearScreen ; Limpia la pantalla
 				print mensajeEncabezado
 				print mensajeMenuUsuario ; Muestra el menu
+				llamarUsuario
 				getChar ; Captura el caracter
 				CMP AL, 49D ; caracter == 1
-				JE INGRESAR  ; Ingresar
+				JE INICIARJUEGO  ; Ingresar
 				CMP AL, 50D ; caracter == 2
-				JE REGISTRAR ; Registrar
+				JE CARGARJUEGO ; Registrar
 				CMP AL, 51D ; caracter == 3
 				JE MENU  ; Salir
 				JMP AREAUSUARIO ; Si el caracter no es un numero entre [1,8] regresa al menu
 		;===========
 		;==USUARIO==
 		;===========
+
+		;=================
+		;==INICIAR JUEGO==
+		;=================
+			INICIARJUEGO:
+				pintarJuego
+				getChar
+		;=================
+		;==INICIAR JUEGO==
+		;=================
+
+		;=================
+		;==CARGAR JUEGO==
+		;=================
+			CARGARJUEGO:
+
+		;=================
+		;==CARGAR JUEGO==
+		;=================
 
 		;==============
 		;==REGISTRAR===
@@ -486,6 +502,35 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 		;================
 		;===REGISTRAR====
 		;================
+
+		;============
+		;==INGRESAR==
+		;============
+			INGRESAR:
+				clearScreen ; Limpia la pantalla
+				print mensajeIngreseUsuario ; Solicita el usuario
+				stringRead  datoUsuario ; Lee el usuario
+				print mensajeIngresePassword ; Solicita la contraseña
+				stringRead  datoPassword ; Lee la password
+				CALL comprobarLogin
+				CMP matchUsuario, 0000
+				JE ERRORLOGIN
+
+				stringCompare datoUsuario, usuarioAdmin
+				CMP comparation, 0001
+				JE AREAADMINISTRADOR ; Es administrador
+				JMP AREAUSUARIO ; Entra al area
+
+			ERRORLOGIN:
+				clearScreen
+				print errorLoginIncorrecto
+				resetTmp
+				resetOriginales
+				getChar
+				JMP INGRESAR
+		;============
+		;==INGRESAR==
+		;============
 
 		;=========
 		;==SALIR==
@@ -780,89 +825,136 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 					RET
 			buscarTopTiempo ENDP
 
-			quickSort PROC
-				MOV AX, p
-				CMP AX, r
-				JGE BIGGER1
+			;	void quickSort(int * A, int p, int r)    {
+    		;		if (p < r)  {
+			;	        int q = partition(A, p, r);
+			;	        quickSort(A, p, q-1);
+			;	        quickSort(A, q+1, r);
+			;	    }
+			;	}
 
-				CALL partition
+			quickSort PROC 				;	void quickSort(int *A, int p, int r){
+				MOV AX, p 				;		
+				CMP AX, r 				;
+				JGE BIGGER1 			;		if(p < r){
 
-				MOV q, AX
+				CALL partition			;						
 
-				INC AX
-				PUSH AX
-				PUSH r
+				MOV q, AX 				;			q = partition(A, p, r);
 
-				MOV AX, q
-				MOV r, AX
-				DEC r
-				CALL quickSort
+				INC AX 					;
+				PUSH AX 				;
+				PUSH r 					; 			p = q + 1
 
-				POP r
-				POP p
-				CALL quickSort
+				MOV AX, q 				;
+				MOV r, AX 				;
+				DEC r 					; 			r = q - 1
+				CALL quickSort 			;			quickSort(A, p, q - 1);
 
-				BIGGER1:
-					RET
+				POP r 					;
+				POP p 					;
+				CALL quickSort 			; 			quickSort(A, q + 1, r);
+				BIGGER1:				;		}
+					RET 				;	}
 			quickSort ENDP
 
-			partition PROC
+			;	int partition(int * A, int p, int r)    {
+			;	    int x = A[r];
+			;	    int i = p - 1;
+			;	
+			;	    for (int j=p; j<r; j++) {
+			;	        if (A[j] <= x)  {
+			;	            i = i + 1;
+			;	
+			;	            int tmp1 = A[i];
+			;	            A[i] = A[j];
+			;	            A[j] = tmp1;
+			;	        }
+			;	    }
+			;	
+			;	    int tmp2 = A[i+1];
+			;	    A[i+1] = A[r];
+			;	    A[r] = tmp2;
+			;	
+			;	    return (i+1);
+			;	}
+
+			partition PROC 											;	int partition(int *A, int p, int r){
 				MOV SI, offset arr
 				MOV AX, r
 				SHL AX, 1
 				ADD SI, AX
 				MOV AX, [SI]
-				MOV x, AX
+				MOV x, AX 											;		int x = A[r];
 
 				MOV AX, p
-				MOV i, AX
+				MOV i, AX 											;		int i = p - 1;
 				DEC i
 
 				MOV AX, p
 				MOV j, AX
 
-				FOR_J:
+				FOR_J:												;		for(int j = p; j < r; j++){
 					MOV SI, offset arr
 					MOV AX, j
 					SHL AX, 1
 					ADD SI, AX
 					MOV AX, [SI]
 
-					CMP tipoQuick, 0000
-					JE pintarAS
-					JMP pintarDe
+					CMP tipoQuick, 0000								;	GRAFICA
+					JE pintarAS										;	GRAFICA
+					JMP pintarDe									;	GRAFICA
 
-					pintarAS:
-						dibujarAscendenteQuick mensajeQuick
-						JMP CONT
+					pintarAS:										;	GRAFICA
+						dibujarAscendenteQuick mensajeQuick			;	GRAFICA
+						JMP CONT									;	GRAFICA
 
-					pintarDe:
-						dibujarDescendenteQuick mensajeQuick
-						JMP CONT
+					pintarDe:										;	GRAFICA
+						dibujarDescendenteQuick mensajeQuick		;	GRAFICA
+						JMP CONT									;	GRAFICA
 
 					CONT:
-						delayQuick
-						CMP AX, x
-						JG BIGGER
+						delayQuick									;	GRAFICA
+						CMP AX, x 						
+						JG BIGGER 									; 			if (A[j] <= x){
 
-					INC i
+					INC i											;				i = i + 1;
+					MOV DI, offset arr								;
+					MOV CX, i										;
+					SHL CX, 1										;
+					ADD DI, CX										;
+					MOV CX, [DI]									;				tmp1 = A[i];
 
-					MOV DI, offset arr
-					MOV CX, i
-					SHL CX, 1
-					ADD DI, CX
-					MOV CX, [DI]
-
-					MOV [DI], AX
-					MOV [SI], CX
-
+					MOV [DI], AX									;				A[i] = A[j];
+					MOV [SI], CX									;				A[j] = tmp1;
 
 
-					BIGGER:
-						INC j
-						MOV AX, r
-						CMP j, AX
-						JL FOR_J
+					;Area de sonido
+					PUSH AX
+					PUSH DX
+					PUSH CX
+
+					XOR AX, AX
+					XOR CX, CX
+					XOR DX, DX
+
+					MOV AX, [SI]
+					MOV CX, 10
+					DIV CX
+
+					reproducirSonido AL
+					POP CX
+					POP DX
+					POP AX
+
+
+																	;			}
+																	;		}
+					BIGGER:											;				
+						INC j										;
+						MOV AX, r									;
+						CMP j, AX									;
+						JL FOR_J									;
 
 				INC i
 				MOV SI, offset arr
@@ -879,6 +971,24 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 
 				MOV [DI], AX
 				MOV [SI], CX
+
+				;Area de sonido
+				PUSH AX
+				PUSH DX
+				PUSH CX
+
+				XOR AX, AX
+				XOR CX, CX
+				XOR DX, DX
+
+				MOV AX, [SI]
+				MOV CX, 10
+				DIV CX
+				
+				reproducirSonido AL
+				POP CX
+				POP DX
+				POP AX
 
 				MOV AX, i
 				RET
