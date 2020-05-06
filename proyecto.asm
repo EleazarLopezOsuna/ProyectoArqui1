@@ -18,7 +18,7 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 	;==MENSAJES A MOSTRAR==
 	;======================
 		mensajeEncabezado DB 0AH, 0DH, '	UNIVERSIDAD DE SAN CARLOS DE GUATEMALA', 0AH, 0DH, '	FACULTAD DE INGENIERIA', 0AH, 0DH, '	CIENCIAS Y SISTEMAS', 0AH, 0DH, '	ARQUITECTURA DE COMPUTADORES Y ENSAMBLADORES 1', 0AH, 0DH, '	NOMBRE: ELEAZAR JARED LOPEZ OSUNA', 0AH, 0DH, '	CARNET: 201700893', 0AH, 0DH, '	SECCION: A', '$'
-		mensajeMenuUsuario DB 0AH, 0DH, '	Seleccione una opcion', 0AH, 0DH, '	1) Iniciar Juego', 0AH, 0DH, '	2) Cargar Juego', 0AH, 0DH, '	3) Salir', 0AH, 0DH, '	',  '$' ; Menu Usuario
+		mensajeMenuUsuario DB 0AH, 0DH, '	Seleccione una opcion', 0AH, 0DH, '	1) Iniciar Juego', 0AH, 0DH, '	2) Salir',  '$' ; Menu Usuario
 		mensajeMenuIngreso DB 0AH, 0DH, '	Seleccione una opcion', 0AH, 0DH, '	1) Ingresar', 0AH, 0DH, '	2) Registrar', 0AH, 0DH, '	3) Salir', 0AH, 0DH, '	',  '$' ; Menu Ingreso
 		mensajeMenuAdmin DB 0AH, 0DH, '	Seleccione una opcion', 0AH, 0DH, '	1) Top 10 Puntos', 0AH, 0DH, '	2) Top 10 Tiempo', 0AH, 0DH, '	3) Salir', 0AH, 0DH, '	',  '$' ; Menu Ingreso
 		mensajeIngreseUsuario DB 0AH, 0DH, '	Ingrese un usuario: ', '$'
@@ -32,6 +32,7 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 		mensajeBubble DB '    BubbleSort - T: 00:00 - V: 0', '$' ; 20,21:23,24 31
 		mensajeQuick  DB '    QuickSort - T: 00:00 - V: 0', '$'  ; 19,20:22,23 30
 		mensajeShell  DB '    ShellSort - T: 00:00 - V: 0', '$'  ; 19,20:22,23 30
+		mensajeGameOver DB '	Game Over', '$'
 	;======================
 	;==MENSAJES A MOSTRAR==
 	;======================
@@ -60,8 +61,11 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 		contadorCaracteres DW 0000
 		archivoUsuarios DB 'users.us', 0
 		archivoPuntajes DB 'score.ust', 0
+		archivoNiveles DB 'entrada.pay', 0
+		archivoReporte DB 'repo.rep', 0
  		textoUs DB 9999 dup('$')
  		textoUst DB 9999 dup('$')
+ 		textoNiv DB 270 dup('$')
 		filehandle DW ?
  		tmpUsuario DB 8 dup('$')
  		tmpPassword DB 5 dup('$')
@@ -142,10 +146,11 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 
  		teest DB 0000
 
- 											;===========NOMBRE==============;						  ;==NIVEL==;				;===SCORE====;				   ;==============TIEMPO================;
- 											;4    5    6    7    8    9    10							16    17				  21   22   23					27   28        30   31        33   34
- 		mensajeJuego DB 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 58D, 48D, 48D, 58D, 48D, 48D, '$'
+ 								  ;===========NOMBRE==============;						                         ;==NIVEL==;			   ;===SCORE====;			    ;==============TIEMPO================;
+ 								  ;2    3    4    5    6    7    8							                      18    19				   23   24   25					29   30        32   33        35   36
+ 		mensajeJuego DB 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 32D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 48D, 32D, 32D, 32D, 48D, 48D, 58D, 48D, 48D, 58D, 48D, 48D, '$'
  		
+ 		punteoFinal DB 0000
 
  		posicionCarro DB 18D
  		colorCarro DB 0001B
@@ -158,13 +163,50 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
  		;15-16 -> PUNTOS OBSTACULOS
  		;17-18 -> PUNTOS PREMIO
  		;19    -> COLOR
- 		nivel1 DB 20 dup(32D)
- 		nivel2 DB 20 dup(32D)
- 		nivel3 DB 20 dup(32D)
- 		nivel4 DB 20 dup(32D)
- 		nivel5 DB 20 dup(32D)
- 		nivel6 DB 20 dup(32D)
+ 		nivel1 DB 21 dup('$')
+ 		nivel2 DB 21 dup('$')
+ 		nivel3 DB 21 dup('$')
+ 		nivel4 DB 21 dup('$')
+ 		nivel5 DB 21 dup('$')
+ 		nivel6 DB 21 dup('$')
 
+ 		tempasd DB 0AH, 0DH
+
+ 		; TIPO OBJETO: 1110 -> obstaculo      0010B -> premio
+ 		; cada index del arreglo representa el segundo en el cual saldran los objetos
+ 		posicionObjetoY DB 99 dup(02)
+ 		posicionObjetoX DB 99 dup(00)
+ 		tipoObjeto DB 99 dup(0010B)
+
+
+ 		nivelActual DB 0000
+ 		objetosTotales DW 0000
+ 		objetosVisibles DW 0000
+ 		puntosSumar DB 0002
+ 		puntosRestar DB 0001
+ 		contadorCiclosJuego DB 0000
+ 		tiempoNivel DB 0000
+ 		tiempoEnemigos DB 0000
+ 		tiempoPremios DB 0000
+
+
+ 		tempNombre DB 7 dup(32D)
+ 		aaaa DB '$'
+ 		tempNumeroNivel DB 0000
+ 		tempTimpoNivel DB 0000, 0000
+ 		tempTiempoObstaculo DB 0000, 0000
+ 		tempTiempoPremio DB 0000, 0000
+ 		tempPuntosObstaculo DB 0000, 0000
+ 		tempPuntosPremio DB 0000, 0000
+ 		tempColorNivel DB 0000
+
+ 		tempTransformacionNumero DB 0000
+
+ 		tempPunteoFinal DB 0000, 0000
+ 		tempTiempoFinal DB 0000, 0000
+ 		tempNivelFinal DB 0000
+
+ 		tempTextoReporte DB 9999 dup('$')
 	;==DATOS EXTRA==
 	;===============
 
@@ -222,6 +264,7 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 				ordenarTop
 				mostrarTop
 				getChar
+				crearReporte
 				CMP AL, 32D ; 32 == Espacio
 				JE GRAFICARTOP  ; Ingresar
 				JMP AREAADMINISTRADOR
@@ -433,13 +476,10 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 				clearScreen ; Limpia la pantalla
 				print mensajeEncabezado
 				print mensajeMenuUsuario ; Muestra el menu
-				llamarUsuario
 				getChar ; Captura el caracter
 				CMP AL, 49D ; caracter == 1
 				JE INICIARJUEGO  ; Ingresar
 				CMP AL, 50D ; caracter == 2
-				JE CARGARJUEGO ; Registrar
-				CMP AL, 51D ; caracter == 3
 				JE MENU  ; Salir
 				JMP AREAUSUARIO ; Si el caracter no es un numero entre [1,8] regresa al menu
 		;===========
@@ -450,20 +490,42 @@ INCLUDE macros.asm ; Incluye el archivo donde se encuentran todos los macros alm
 		;==INICIAR JUEGO==
 		;=================
 			INICIARJUEGO:
+				fileReader archivoNiveles, textoNiv
+				insertarNiveles
+				;llamarUsuario
+				;llamarNivel
+
+				MOV nivelActual, 0001
+
+				;print nivel1
+				;print nivel2
+				;print nivel3
+				;print nivel4
+				;print nivel5
+				;print nivel6
+				;getChar
+
 				pintarJuego
 				getChar
 		;=================
 		;==INICIAR JUEGO==
 		;=================
 
-		;=================
-		;==CARGAR JUEGO==
-		;=================
-			CARGARJUEGO:
+		;===================
+		;==FINALIZAR JUEGO==
+		;===================
+			FINALIZARJUEGO:
+				MOV AX, 0013H
+				INT 0010H
+				MOV CX, 013EH
+				print mensajeGameOver
+				insertarPunteo
+				getChar
+				JMP AREAUSUARIO
 
-		;=================
-		;==CARGAR JUEGO==
-		;=================
+		;===================
+		;==FINALIZAR JUEGO==
+		;===================
 
 		;==============
 		;==REGISTRAR===

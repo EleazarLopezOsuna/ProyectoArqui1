@@ -13,6 +13,11 @@ getChar MACRO
 	INT 21H
 ENDM
 
+getChar2 MACRO
+	MOV AH, 11H
+	INT 16H
+ENDM
+
 clearScreen MACRO
 	MOV AH, 0000H
 	MOV AL, 0002H
@@ -255,7 +260,6 @@ getNumber MACRO bufferFecha, registro
 	SALIR:
 ENDM
 
-;Modificar a .ply
 comprobarExtension MACRO
 	pushear
 	XOR SI, SI
@@ -272,6 +276,26 @@ comprobarExtension MACRO
 	JNE ERROR_EXTENSION
 	CMP calculadoraNombreArchivo[SI - 2 ], 0061H ; Ultimo - 2 caracter con la letra a
 	JNE ERROR_EXTENSION
+	poppear
+ENDM
+
+fileReader MACRO archivo, texto
+	pushear
+	MOV AH, 3DH ; abre el archivo
+   	MOV AL, 0 ; abre para lectura
+   	LEA DX, archivo
+   	INT 21H ; interrupcion
+   	MOV [filehandle], AX ; carga el handler
+
+   	MOV AH, 3FH ; leer
+   	LEA DX, texto ; se almacena en texto
+   	MOV CX, 9999 ; lee 65 caracteres
+   	MOV BX, [filehandle] ; recorre buffer
+   	INT 21H ; interrupcion
+
+   	MOV BX, [filehandle]
+   	MOV AH, 3EH ; cierra el archivo
+   	INT 21H	; interrupcion
 	poppear
 ENDM
 
@@ -296,26 +320,6 @@ stringCompare MACRO usuarioIngresado, usuarioExistente
 		JMP FIN
 	FIN:
 		poppear
-ENDM
-
-fileReader MACRO archivo, texto
-	pushear
-	MOV AH, 3DH ; abre el archivo
-   	MOV AL, 0 ; abre para lectura
-   	LEA DX, archivo
-   	INT 21H ; interrupcion
-   	MOV [filehandle], AX ; carga el handler
-
-   	MOV AH, 3FH ; leer
-   	LEA DX, texto ; se almacena en texto
-   	MOV CX, 9999 ; lee 65 caracteres
-   	MOV BX, [filehandle] ; recorre buffer
-   	INT 21H ; interrupcion
-
-   	MOV BX, [filehandle]
-   	MOV AH, 3EH ; cierra el archivo
-   	INT 21H	; interrupcion
-	poppear
 ENDM
 
 resetTmp MACRO
@@ -454,7 +458,7 @@ insertarNuevoPuntaje MACRO texto, user, score, time, nivel
 		MOV AH, score[0001]
 		ADD AH, 48D
 		MOV texto[SI + 2], AH
-		MOV texto[SI + 3], 59D ; 59 = ;
+		MOV texto[SI + 3], 95D ; 95 = _
 		MOV AH, time[0000]
 		ADD AH, 48D
 		MOV texto[SI + 4], AH
@@ -471,9 +475,9 @@ insertarNuevoPuntaje MACRO texto, user, score, time, nivel
 		JMP CICLO3
 
 	SALIR3:
-		MOV texto[SI], 59D
+		MOV texto[SI], 64D
 		MOV AH, nivel
-		MOV AH, 48D
+		ADD AH, 48D
 		MOV texto[SI + 1], AH
 
 		ADD SI, 0002 
@@ -745,6 +749,7 @@ mostrarTop MACRO
 		MOV numeroActual[0036], DL
 
 		print numeroActual
+		agregarTexto
 		print mensajevacio
 		INC BX
 		CMP BX, 0010D
@@ -760,6 +765,39 @@ mostrarTop MACRO
 
 	SALIR:
 		poppear
+ENDM
+
+agregarTexto MACRO
+	LOCAL CICLO1, CICLO2
+	pushear
+	XOR SI, SI
+
+	CICLO1:
+		XOR DI, DI
+		CMP tempTextoReporte[SI], 36D
+		JE CICLO2
+		INC SI
+		CMP SI, 9999
+		JL CICLO1
+
+	CICLO2:
+		MOV AL, numeroActual[DI]
+		MOV tempTextoReporte[SI], AL
+		INC DI
+		INC SI
+		CMP DI, 40
+		JL CICLO2
+
+	MOV indexFinal, SI
+	;MOV tempTransformacionNumero[SI + 1], 13D
+	poppear
+ENDM
+
+crearReporte MACRO
+	pushear
+	SUB indexFinal, 03
+	fileCreate tempTextoReporte, archivoReporte
+	poppear
 ENDM
 
 buscarNombreUsuario MACRO
@@ -840,6 +878,13 @@ buscarNombreUsuario MACRO
 			JE NUEVALINEA
 			CMP textoUst[SI], 64D ; 64 = @
 			JE LVL
+			INC SI
+			CMP textoUst[SI], 36D ; 36 = Fin
+			JE SALIR
+			CMP textoUst[SI], 13D ; 13 = Nueva linea
+			JE NUEVALINEA
+			CMP textoUst[SI], 64D ; 64 = @
+			JE LVL
 			JMP IGNORAR
 
 		LVL:
@@ -851,7 +896,6 @@ buscarNombreUsuario MACRO
 
 		NUEVALINEA:
 			INC BX
-			INC SI
 			INC SI
 			JMP CICLO
 
@@ -2056,7 +2100,7 @@ llamarUsuario MACRO
 		MOV AL, datoUsuario[SI]
 		CMP AL, 36D
 		JE SALIR
-		MOV mensajeJuego[SI + 0004], AL
+		MOV mensajeJuego[SI + 0002], AL
 		INC SI
 		CMP SI, 07
 		JL CICLO
@@ -2064,33 +2108,211 @@ llamarUsuario MACRO
 		poppear
 ENDM
 
-pintarJuego MACRO color
-	LOCAL IZQUIERDA, DERECHA, CICLO, SALIR
+llamarNivel MACRO
+	LOCAL L1, L2, L3, L4, L5, L6, SALIR
 	pushear
+	MOV AL, nivelActual
+	CMP AL, 0001
+	JE L1
+	CMP AL, 0002
+	JE L2
+	CMP AL, 0003
+	JE L3
+	CMP AL, 0004
+	JE L4
+	CMP AL, 0005
+	JE L5
+	CMP AL, 0006
+	JE L6
+
+	L1:
+		MOV AL, nivel1[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel1[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel1[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel1[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel1[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel1[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel1[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel1[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel1[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+	L2:
+		MOV AL, nivel2[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel2[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel2[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel2[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel2[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel2[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel2[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel2[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel2[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+
+	L3:
+		MOV AL, nivel3[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel3[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel3[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel3[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel3[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel3[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel3[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel3[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel3[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+
+	L4:
+		MOV AL, nivel4[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel4[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel4[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel4[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel4[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel4[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel4[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel4[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel4[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+
+	L5:
+		MOV AL, nivel5[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel5[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel5[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel5[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel5[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel5[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel5[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel5[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel5[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+
+	L6:
+		MOV AL, nivel6[00]
+		MOV mensajeJuego[10], AL
+		MOV AL, nivel6[01]
+		MOV mensajeJuego[11], AL
+		MOV AL, nivel6[02]
+		MOV mensajeJuego[12], AL
+		MOV AL, nivel6[03]
+		MOV mensajeJuego[13], AL
+		MOV AL, nivel6[04]
+		MOV mensajeJuego[14], AL
+		MOV AL, nivel6[05]
+		MOV mensajeJuego[15], AL
+		MOV AL, nivel6[06]
+		MOV mensajeJuego[16], AL
+		MOV AL, nivel6[07]
+		MOV mensajeJuego[18], AL
+		MOV AL, nivel6[08]
+		MOV mensajeJuego[19], AL
+		JMP SALIR
+
+	SALIR:
+		poppear
+ENDM
+
+pintarJuego MACRO
+	LOCAL IZQUIERDA, DERECHA, CICLO, SALIR, PAUSA, CONTINUAR, SIGUIENTENIVEL, EMPIEZA
+	pushear
+	EMPIEZA:
+		llamarUsuario
+		llamarNivel
+		pruebaObjetos
+		obtenerPropiedades
+
+	MOV AX, 0013H
+	INT 0010H
+	MOV CX, 013EH
 
 	CICLO:
-		MOV AX, 0013H
-		INT 0010H
-		MOV CX, 013EH
+		INC objetosVisibles
 		dibujarMensaje mensajeJuego
 		pintarFondo
+		pintarObjeto
 		pintarCarro
-	
-		getChar
-		CMP AL, 0075D
+
+		delayMovimiento
+		getChar2
+		JZ CICLO
+
+		CMP AH, 0075D
 		JE IZQUIERDA
-		CMP AL, 0080D
+		CMP AH, 0080D
 		JE DERECHA
 		CMP AL, 0032D
 		JE SALIR
-		JMP CICLO
+		CMP AL, 112D
+		JE PAUSA
+		CMP AL, 110D
+		JE SIGUIENTENIVEL
+		CMP AL, 116D
+		JE SALIR
+
+		CONTINUAR:
+			MOV AH, 10H
+			INT 16H
+			delayMovimiento
+			JMP CICLO
+
+		PAUSA:
+			MOV AH, 10H
+			INT 16H
+			realizarPausa
+			JMP CONTINUAR
 	
 		IZQUIERDA:
+			MOV AH, 10H
+			INT 16H
 			MOV CL, posicionCarro
 			DEC CL
 			JMP VERIFICARMOV
 	
 		DERECHA:
+			MOV AH, 10H
+			INT 16H
 			MOV CL, posicionCarro
 			INC CL
 			JMP VERIFICARMOV
@@ -2101,8 +2323,18 @@ pintarJuego MACRO color
 			CMP CL, 34
 			JA CICLO
 			MOV posicionCarro, CL
-			pintarFondo
 			JMP CICLO
+
+	SIGUIENTENIVEL:
+			MOV AH, 10H
+			INT 16H
+			resetearObjetos
+			INC nivelActual
+			MOV objetosVisibles, 0000
+			MOV AL, nivelActual
+			CMP AL, 06
+			JE SALIR
+			JMP EMPIEZA
 
 	SALIR:
 		poppear
@@ -2116,7 +2348,7 @@ pintarFondo MACRO
 		MOV BH, 0111B
 		MOV CH, 02
 		MOV CL, 02
-		MOV DH, 23
+		MOV DH, 24
 		MOV DL, 36
 		INT 10H
 	poppear
@@ -2128,11 +2360,657 @@ pintarCarro MACRO
 		MOV AH, 06H
 		MOV AL, 00
 		MOV BH, colorCarro
-		MOV CH, 21
+		MOV CH, 22
 		MOV CL, posicionCarro
-		MOV DH, 23
+		MOV DH, 24
 		MOV DL, CL
 		ADD DL, 02
 		INT 10H
+	poppear
+ENDM
+
+pintarObjeto MACRO
+	LOCAL CICLO, SALTAR, ELIMINAR, SALIR, COLISION_Y, COLISION_X, CHOCARON, SUMAR
+	pushear
+	XOR SI, SI
+	XOR DI, DI
+	CICLO:
+		MOV AL, posicionObjetoX[SI]
+		CMP AL, 00
+		JE SALTAR
+		INC DI
+		;Area de Objeto
+			MOV AH, 06H
+			MOV AL, 00
+			MOV BH, tipoObjeto[SI]
+			MOV CH, posicionObjetoY[SI]
+			MOV CL, posicionObjetoX[SI]
+			MOV DH, CH
+			MOV DL, CL
+			ADD DL, 02
+			ADD DH, 02
+			INT 10H
+
+			MOV AL, posicionObjetoY[SI]
+			INC AL
+			CMP AL, 22D
+			JA ELIMINAR
+			MOV posicionObjetoY[SI], AL
+			
+			COLISION_Y:
+				MOV AL, posicionObjetoY[SI]
+				MOV AH, 22
+				CMP AL, AH
+				JL SALTAR
+
+			COLISION_X:
+				MOV AL, posicionObjetoX[SI]
+				MOV AH, posicionCarro
+				CMP AL, AH
+				JE CHOCARON
+				JMP SALTAR
+
+			CHOCARON:
+				MOV AL, tipoObjeto[SI]
+				CMP AL, 0010B
+				JE SUMAR
+				MOV AH, punteoFinal
+				CMP AH, puntosRestar
+				JB FINALIZARJUEGO
+				SUB AH, puntosRestar
+				MOV punteoFinal, AH
+				descomponerNumero
+				JMP ELIMINAR
+
+			SUMAR:
+				MOV AH, puntosSumar
+				ADD punteoFinal, AH
+				descomponerNumero
+				JMP ELIMINAR
+
+			ELIMINAR:
+				MOV posicionObjetoX[SI], 00
+
+		SALTAR:
+			INC SI
+			CMP DI, objetosVisibles
+			JE SALIR
+			CMP SI, 99
+			JL CICLO
+
+	SALIR:
+		poppear
+ENDM
+
+pruebaObjetos MACRO
+	pushear
+	MOV AL, 03
+	MOV posicionObjetoX[0000], AL
+
+	MOV AL, 06
+	MOV posicionObjetoX[0001], AL
+	MOV AL, 1110B
+	MOV tipoObjeto[0001], AL
+
+	MOV AL, 10
+	MOV posicionObjetoX[0002], AL
+	MOV AL, 1110B
+	MOV tipoObjeto[0002], AL
+
+	MOV AL, 15
+	MOV posicionObjetoX[0003], AL
+
+	MOV AL, 02
+	MOV posicionObjetoX[0004], AL
+
+	MOV AL, 08
+	MOV posicionObjetoX[0005], AL
+
+	MOV AL, 05
+	MOV posicionObjetoX[0006], AL
+
+	MOV AL, 09
+	MOV posicionObjetoX[0007], AL
+
+	MOV AL, 11
+	MOV posicionObjetoX[0008], AL
+
+	MOV AL, 15
+	MOV posicionObjetoX[0009], AL
+	MOV AL, 1110B
+	MOV tipoObjeto[0009], AL
+
+	MOV objetosTotales, 0011
+	poppear
+ENDM
+
+delayMovimiento MACRO
+	LOCAL LOOP1, LOOP2,LOOP3
+	pushear
+	MOV AL, 25D
+	LOOP1:
+    	MOV SI, 500
+		LOOP2:
+    		PUSH SI
+    		MOV SI, 10
+    		LOOP3:
+      			DEC SI
+      			JNZ LOOP3
+    		POP SI  
+    		DEC SI
+    		JNZ LOOP2
+    	DEC AL
+		JNZ LOOP1
+	poppear
+ENDM
+
+insertarNiveles MACRO
+	LOCAL NOMBRE, NUMEROS, N1, N2, N3, N4, N5, N6, COLOR, NUEVALINEA, LIMPIAR, SALIR, ROJ, BLA, AZU, VER, NUEVO
+	pushear
+	XOR SI, SI
+	XOR DI, DI
+
+	MOV tempNumeroNivel, 48D
+
+	NUEVO:
+		ADD SI, 06
+
+	NOMBRE:
+		CMP textoNiv[SI], 36D ; 36 = $ -> Termino
+		JE SALIR
+		CMP textoNiv[SI], 59D ; 59 = ; -> empiezan numeros
+		JE NUMEROS
+		MOV AL, textoNiv[SI]
+		MOV tempNombre[DI], AL
+		INC SI
+		INC DI
+		JMP NOMBRE
+
+	NUMEROS:
+		XOR DI, DI
+		INC tempNumeroNivel
+		MOV tempNumeroNivel, AL
+		MOV AL, textoNiv[SI]
+
+		;Tiempo Nivel
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTimpoNivel[0000], AL
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTimpoNivel[0001], AL
+		INC SI
+
+		;Tiempo Obstaculos
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTiempoObstaculo[0000], AL
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTiempoObstaculo[0001], AL
+		INC SI
+
+		;Tiempo Premio
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTiempoPremio[0000], AL
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempTiempoPremio[0001], AL
+		INC SI
+
+		;Puntos  Obstaculos
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempPuntosObstaculo[0000], AL
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempPuntosObstaculo[0001], AL
+		INC SI
+
+		;Puntos Premio
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempPuntosPremio[0000], AL
+		INC SI
+		MOV AL, textoNiv[SI]
+		MOV tempPuntosPremio[0001], AL
+		INC SI
+
+	COLOR:
+		INC SI
+		MOV AL, textoNiv[SI]
+		CMP AL, 97D ; 97 = a
+		JE AZU
+		CMP AL, 98D ; 98 = b
+		JE BLA
+		CMP AL, 114D ; 114 = r
+		JE ROJ
+		CMP AL, 118D ; 118 = v
+		JE VER
+
+	AZU:
+		MOV AL, 0001B
+		MOV tempColorNivel, AL
+		JMP IGNORAR
+
+	BLA:
+		MOV AL, 1111B
+		MOV tempColorNivel, AL
+		JMP IGNORAR
+
+	ROJ:
+		MOV AL, 0100B
+		MOV tempColorNivel, AL
+		JMP IGNORAR
+
+	VER:
+		MOV AL, 0010B
+		MOV tempColorNivel, AL
+		JMP IGNORAR
+
+
+	IGNORAR:
+		INC SI
+		CMP textoNiv[SI], 13D ; 13 = nueva linea
+		JE NUEVALINEA
+		JMP IGNORAR
+
+	NUEVALINEA:
+		MOV AL, tempNumeroNivel
+		CMP AL, 0049
+		JE N1
+		CMP AL, 0050
+		JE N2
+		CMP AL, 0051
+		JE N3
+		CMP AL, 0052
+		JE N4
+		CMP AL, 0053
+		JE N5
+		CMP AL, 0054
+		JE N6
+
+	N1:
+		cambiarNivel nivel1
+		JMP LIMPIAR
+	N2:
+		cambiarNivel nivel2
+		JMP LIMPIAR
+	N3:
+		cambiarNivel nivel3
+		JMP LIMPIAR
+	N4:
+		cambiarNivel nivel4
+		JMP LIMPIAR
+	N5:
+		cambiarNivel nivel5
+		JMP LIMPIAR
+	N6:
+		cambiarNivel nivel6
+		JMP LIMPIAR
+
+	LIMPIAR:
+		limpiarTemp
+		INC SI
+		INC SI
+		JMP NUEVO
+
+	SALIR:
+		poppear
+ENDM
+
+cambiarNivel MACRO nivel
+	LOCAL CICLO
+	pushear
+	MOV AL, tempNombre[0000]
+	MOV nivel[0000], AL
+	MOV AL, tempNombre[0001]
+	MOV nivel[0001], AL
+	MOV AL, tempNombre[0002]
+	MOV nivel[0002], AL
+	MOV AL, tempNombre[0003]
+	MOV nivel[0003], AL
+	MOV AL, tempNombre[0004]
+	MOV nivel[0004], AL
+	MOV AL, tempNombre[0005]
+	MOV nivel[0005], AL
+	MOV AL, tempNombre[0006]
+	MOV nivel[0006], AL
+	MOV AL, 48D
+	MOV nivel[0007], AL
+	MOV AL, tempNumeroNivel
+	MOV nivel[0008], AL
+	MOV AL, tempTimpoNivel[0000]
+	MOV nivel[0009], AL
+	MOV AL, tempTimpoNivel[0001]
+	MOV nivel[0010], AL
+	MOV AL, tempTiempoObstaculo[0000]
+	MOV nivel[0011], AL
+	MOV AL, tempTiempoObstaculo[0001]
+	MOV nivel[0012], AL
+	MOV AL, tempTiempoPremio[0000]
+	MOV nivel[0013], AL
+	MOV AL, tempTiempoPremio[0001]
+	MOV nivel[0014], AL
+	MOV AL, tempPuntosObstaculo[0000]
+	MOV nivel[0015], AL
+	MOV AL, tempPuntosObstaculo[0001]
+	MOV nivel[0016], AL
+	MOV AL, tempPuntosPremio[0000]
+	MOV nivel[0017], AL
+	MOV AL, tempPuntosPremio[0001]
+	MOV nivel[0018], AL
+	MOV AL, tempColorNivel
+	MOV nivel[0019], AL
+	poppear
+ENDM
+
+limpiarTemp MACRO
+	LOCAL CICLO
+	pushear
+	MOV AL, 32D
+	MOV tempNombre[0000], AL
+	MOV tempNombre[0001], AL
+	MOV tempNombre[0002], AL
+	MOV tempNombre[0003], AL
+	MOV tempNombre[0004], AL
+	MOV tempNombre[0005], AL
+	MOV tempNombre[0006], AL
+
+	MOV AL, 0000
+	MOV tempNumeroNivel, AL
+	MOV tempTimpoNivel[0000], AL
+	MOV tempTimpoNivel[0001], AL
+	MOV tempTiempoObstaculo[0000], AL
+	MOV tempTiempoObstaculo[0001], AL
+	MOV tempTiempoPremio[0000], AL
+	MOV tempTiempoPremio[0001], AL
+	MOV tempPuntosObstaculo[0000], AL
+	MOV tempPuntosObstaculo[0001], AL
+	MOV tempPuntosPremio[0000], AL
+	MOV tempPuntosPremio[0001], AL
+	MOV tempColorNivel, AL
+	poppear
+ENDM
+
+transformarNumero MACRO decena, unidad
+	pushear
+	XOR AX, AX
+	XOR BX, BX
+
+	MOV AL, decena
+	SUB AL, 48D
+	MOV BL, 10
+	MUL BL
+
+	MOV BL, unidad
+	SUB BL, 48D
+	ADD AL, BL
+
+	MOV tempTransformacionNumero, AL
+	poppear
+ENDM
+
+obtenerPropiedades MACRO
+	LOCAL L1, L2, L3, L4, L5, L6, SALIR
+	pushear
+	MOV AL, nivelActual
+	CMP AL, 0001
+	JE L1
+	CMP AL, 0002
+	JE L2
+	CMP AL, 0003
+	JE L3
+	CMP AL, 0004
+	JE L4
+	CMP AL, 0005
+	JE L5
+	CMP AL, 0006
+	JE L6
+
+	L1:
+		MOV AL, nivel1[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel1[0017], nivel1[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel1[0015], nivel1[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel1[0009], nivel1[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel1[0011], nivel1[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel1[0013], nivel1[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+	L2:
+		MOV AL, nivel2[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel2[0017], nivel2[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel2[0015], nivel2[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel2[0009], nivel2[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel2[0011], nivel2[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel2[0013], nivel2[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+	L3:
+		MOV AL, nivel3[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel3[0017], nivel3[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel3[0015], nivel3[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel3[0009], nivel3[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel3[0011], nivel3[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel3[0013], nivel3[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+	L4:
+		MOV AL, nivel4[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel4[0017], nivel4[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel4[0015], nivel4[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel4[0009], nivel4[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel4[0011], nivel4[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel4[0013], nivel4[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+	L5:
+		MOV AL, nivel5[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel5[0017], nivel5[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel5[0015], nivel5[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel5[0009], nivel5[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel5[0011], nivel5[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel5[0013], nivel5[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+	L6:
+		MOV AL, nivel6[0019]
+		MOV colorCarro, AL
+		
+		transformarNumero nivel6[0017], nivel6[0018]
+		MOV AL, tempTransformacionNumero
+		MOV puntosSumar, AL
+
+		transformarNumero nivel6[0015], nivel6[0016]
+		MOV AL, tempTransformacionNumero
+		MOV puntosRestar, AL
+
+		transformarNumero nivel6[0009], nivel6[0010]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoNivel, AL
+
+		transformarNumero nivel6[0011], nivel6[0012]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoEnemigos, AL
+
+		transformarNumero nivel6[0013], nivel6[0014]
+		MOV AL, tempTransformacionNumero
+		MOV tiempoPremios, AL
+
+		JMP SALIR
+
+
+
+	SALIR:
+		poppear
+ENDM
+
+descomponerNumero MACRO
+	pushear
+	XOR AX, AX
+	XOR BX, BX
+	XOR CX, CX
+	MOV AL, punteoFinal
+	MOV BL, 100
+	DIV BL
+	ADD AL, 48D
+	MOV mensajeJuego[0023], AL
+	MOV AL, AH
+	XOR AH, AH
+	MOV BL, 10
+	DIV BL
+	ADD AL, 48D
+	MOV mensajeJuego[0024], AL
+	ADD AH, 48D
+	MOV mensajeJuego[0025], AH
+	poppear
+ENDM
+
+resetearObjetos MACRO
+	LOCAL CICLO
+	pushear
+	XOR SI, SI
+	CICLO:
+		MOV AL, 02
+		MOV AH, 00
+		MOV BL, 0010B
+		MOV posicionObjetoY[SI], AL
+		MOV posicionObjetoX[SI], AH
+		MOV tipoObjeto[SI], BL
+
+		INC SI
+		CMP SI, 99
+		JL CICLO
+	poppear
+ENDM
+
+realizarPausa MACRO
+	LOCAL CICLO, SALIR
+	pushear
+	CICLO:
+		getChar
+		CMP AL, 32D
+		JE FINALIZARJUEGO
+		CMP AL, 112D
+		JE SALIR
+		JMP CICLO
+
+	SALIR:
+		poppear
+ENDM
+
+insertarPunteo MACRO
+	pushear
+	fileReader archivoPuntajes, textoUst
+	MOV AL, mensajeJuego[0024]
+	MOV AH, mensajeJuego[0025]
+	SUB AL, 48D
+	SUB AH, 48D
+	MOV tempPunteoFinal[0001], AL
+	MOV tempPunteoFinal[0000], AH
+
+	MOV AL, mensajeJuego[0035]
+	MOV AH, mensajeJuego[0036]
+	SUB AL, 48D
+	SUB AH, 48D
+	MOV tempTiempoFinal[0001], AL
+	MOV tempTiempoFinal[0000], AH
+
+	MOV AL, nivelActual
+	MOV tempNivelFinal, AL
+
+	insertarNuevoPuntaje textoUst, datoUsuario, tempPunteoFinal, tempTiempoFinal, nivelActual
+	fileCreate textoUst, archivoPuntajes
 	poppear
 ENDM
